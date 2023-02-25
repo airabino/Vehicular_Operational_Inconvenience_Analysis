@@ -11,6 +11,9 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 from io import StringIO
 
+import warnings
+warnings.filterwarnings("ignore")
+
 def ACS_DF(table,data_name=None,state_FIPS='08'):
 	pull_request='''
 	https://api.census.gov/data/2021/acs/acs5?get=NAME,{}&for=tract:*&in=state:{}
@@ -144,11 +147,11 @@ def ACS_Fix_Total(df,data_keys):
 	df['Total']=totals
 	return df
 
-def PullData(state_FIPS='08'):
+def PullData(state_FIPS='08',path_to_data='../'):
 	#Loading in the shells .csv
 	t0=time.time()
 	print('Loading in the shells .csv:',end='')
-	shells=pd.read_csv('../Data/ACS_2021/ACS2021_Table_Shells.csv')
+	shells=pd.read_csv('{}Data/ACS_2021/ACS2021_Table_Shells.csv'.format(path_to_data))
 	print(' {:.4f} seconds'.format(time.time()-t0))
 
 	#Pulling race data
@@ -195,7 +198,7 @@ def PullData(state_FIPS='08'):
 	#Loading in census tract geometry data
 	t0=time.time()
 	print('Loading in census tract geometry data:',end='')
-	us_ct=gpd.read_file('../Data/ACS_2021/Tract_Geometries/cb_2021_us_bg_500k.shp')
+	us_ct=gpd.read_file('{}Data/ACS_2021/Tract_Geometries/cb_2021_us_tract_500k.shp'.format(path_to_data))
 	co_ct=us_ct[us_ct['STATEFP']==state_FIPS].copy()
 	co_ct['FIPS']=co_ct['GEOID']
 	print(' {:.4f} seconds'.format(time.time()-t0))
@@ -224,10 +227,13 @@ def PullData(state_FIPS='08'):
 	co_ct=co_ct.join(df_income,lsuffix='_mi')
 	print(' {:.4f} seconds'.format(time.time()-t0))
 
+	#Dropping redundant columns
+
 	#Pickling
 	t0=time.time()
 	print('Pickling:',end='')
-	pkl.dump(co_ct,open('../Data/Generated_Data/Census_Tract_Demographic_Data_{}.pkl'.format(state_FIPS),'wb'))
+	pkl.dump(co_ct,open('{}Data/Generated_Data/Census_Tract_Demographic_Data_{}.pkl'.format(
+		path_to_data,state_FIPS),'wb'))
 	print(' {:.4f} seconds'.format(time.time()-t0))
 
 	print('Done')
@@ -237,8 +243,6 @@ def LoadACSData(filepath):
 	gdf['centroid_x']=gdf.centroid.x
 	gdf['centroid_y']=gdf.centroid.y
 	return gdf
-
-
 
 if __name__ == "__main__":
 	argv=sys.argv
