@@ -1,8 +1,11 @@
 #!/bin/bash
 
+afdc_key="HGPBj8jd5JT96ixLhRl8wP970Ux3WHDZbye7EIrr"
+
 mkdir -p Data/NHTS_2017
 mkdir -p Data/Generated_Data
 mkdir -p Data/ACS_2021/Tract_Geometries
+mkdir -p Data/AFDC
 
 [ ! -f ACS2021_Table_Shells.csv ] ||
 cp ACS2021_Table_Shells.csv Data/ACS_2021/ACS2021_Table_Shells.csv
@@ -14,7 +17,7 @@ else
 	echo "Tracts Downloaded"
 fi
 
-if [ ! -f Data/ACS_2021/Tract_Geometries/cb_2021_us_bg_500k.shp ]; then
+if [ ! -f Data/ACS_2021/Tract_Geometries/cb_2021_us_tract_500k.shp ]; then
 	unzip Data/ACS_2021/Tract_Geometries/tracts.zip -d Data/ACS_2021/Tract_Geometries
 	echo "Tracts Unzipped"
 else
@@ -33,4 +36,12 @@ if [ ! -f Data/NHTS_2017/trippub.csv ]; then
 	echo "NHTS Data Unzipped"
 else
 	echo "NHTS Data Unzipped"
+fi
+
+if [ ! -f Data/AFDC/evse_stations.json ]; then
+	afdc_url="https://developer.nrel.gov/api/alt-fuel-stations/v1.json?fuel_type=ELEC&limit=all&api_key=${afdc_key}"
+	curl -o Data/AFDC/evse_stations.json $afdc_url
+	echo "AFDC Data Downloaded"
+else
+	echo "AFDC Data Downloaded"
 fi

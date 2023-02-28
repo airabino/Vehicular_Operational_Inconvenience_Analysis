@@ -23,13 +23,54 @@ from scipy.stats import t
 from scipy.stats._continuous_distns import _distn_names
 from .mapbox_router import RouteSummary
 
+#Function for calculating distances between lon/lat pairs
+def haversine(lon1,lat1,lon2,lat2):
+
+	r=6372800 #[m]
+
+	dLat=np.radians(lat2-lat1)
+	dLon=np.radians(lon2-lon1)
+	lat1=np.radians(lat1)
+	lat2=np.radians(lat2)
+
+	a=np.sin(dLat/2)**2 + np.cos(lat1)*np.cos(lat2)*np.sin(dLon/2)**2
+	c=2*np.arcsin(np.sqrt(a))
+
+	return c*r
+
 def OutlierIndices(x):
 	return ((x>x.mean()+x.std()*3)|(x<x.mean()-x.std()*3))
 
-def FilterOutliers(resources_lons,resources_lats,resources):
+def OutliersFilter(resources_lons,resources_lats,resources):
+
+	distances_from_mean=haversine(resources_lons,resources_lats,
+		resources_lons.mean(),resources_lats.mean())
+	outliers=OutlierIndices(distances_from_mean)
+
+	return resources_lons[~outliers],resources_lats[~outliers],resources[~outliers]
+
+def RemoveOutlierResources(resources_lons,resources_lats,resources):
+
 	resources_lons=np.array(resources_lons)
 	resources_lats=np.array(resources_lats)
 	resources=np.array(resources)
+
+	len_resources=resources.size
+
+	for idx in range(10):
+
+		resources_lons,resources_lats,resources=Filter(resources_lons,resources_lats,resources)
+
+		if len_resources == resources.size:
+			break
+		else:
+			len_resources=resources.size
+
+	return resources_lons,resources_lats,resources
+
+
+
+	
 	outliers=OutlierIndices(resources_lons)
 	resources_lons=resources_lons[~outliers]
 	resources_lats=resources_lats[~outliers]
@@ -134,16 +175,7 @@ def CalculateSIC_NHTS_HO(gdf,model_pickle,hc_col,wc_val,dcfcr_val,bc_val,dcl2=Fa
 	return sic,hc
 
 
-#Function for calculating distances between lon/lat pairs
-def haversine(lon1,lat1,lon2,lat2):
-	r=6372800 #[m]
-	dLat=np.radians(lat2-lat1)
-	dLon=np.radians(lon2-lon1)
-	lat1=np.radians(lat1)
-	lat2=np.radians(lat2)
-	a=np.sin(dLat/2)**2 + np.cos(lat1)*np.cos(lat2)*np.sin(dLon/2)**2
-	c=2*np.arcsin(np.sqrt(a))
-	return c*r
+
 
 #Function for down-selecting census blocks by centroid distance from point
 def DownSlectBlocks(gdf,lon,lat,radius):

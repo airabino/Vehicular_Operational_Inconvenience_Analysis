@@ -1,11 +1,13 @@
 import sys
 import time
+import argparse
 import numpy as np
 import pandas as pd
 import pickle as pkl
-import simulation
-from process_nhts_data import Itinerary
+from .simulation import BEV_Compiled
+from .process_nhts_data import Itinerary
 from tqdm import tqdm
+from datetime import datetime
 
 def fullfact(levels):
 	n = len(levels)  # number of factors
@@ -23,29 +25,32 @@ def fullfact(levels):
 		H[:,i] = rng
 	return H
 
-def RunCase(case,itineraries,row):
-	data=np.ones((len(itineraries),16))*-1
-	for idx in tqdm(range(len(itineraries))):
+def RunCase(case,itineraries,row,iterations=3):
+	data=np.ones((len(itineraries),13))*-1
+	for idx in range(len(itineraries)):
 		try:
-			bev=BEV(itineraries[idx],
-				Dest_Charger_Likelihood=row[2],
-				Consumption_City=row[3],
-				Consumption_Mixed=row[4],
-				Consumption_Highway=row[5],
-				Battery_Capacity=row[6],
-				Plug_In_Penalty=row[7],
-				Dest_Charger_P_AC=row[8],
-				Home_Charger_P_AC=row[0]*row[8],
-				Work_Charger_P_AC=row[1]*row[8],
-				En_Route_Charger_P_AC=row[9],
-				En_Route_Charging_Penalty=row[10])
-			optimal_controls,cost_to_go=bev.Optimize()
-			optimal_control,soc_trace,dedicated_energizing_time,sic,sicd=bev.Evaluate(optimal_controls)
+			sicd_total=0
+			for idx2 in range(iterations):
+				# print('a',case,row)
+				bev=BEV_Compiled(itineraries[idx],
+					Dest_Charger_Likelihood=row[2],
+					Consumption_City=row[3],
+					Consumption_Mixed=row[4],
+					Consumption_Highway=row[5],
+					Battery_Capacity=row[6],
+					Plug_In_Penalty=row[7],
+					Dest_Charger_P_AC=row[8],
+					Home_Charger_P_AC=row[0]*row[8],
+					Work_Charger_P_AC=row[1]*row[8],
+					En_Route_Charger_P_AC=row[9],
+					En_Route_Charging_Penalty=row[10])
+				optimal_controls,_=bev.Optimize()
+				_,_,sicd=bev.Evaluate(optimal_controls)
+				sicd_total+=sicd
 			# print(sic,sicd)
-			data[idx]=np.hstack((case,row,bev.Trip_Distances.sum()/bev.tiles,
-				bev.Parks.sum()/bev.tiles,sic,sicd))
+			data[idx]=np.hstack((case,row,sicd_total/iterations))
 		except:
-			print('a',idx)
+			print('Failed',idx)
 			data[idx,0]=case
 		# break
 	return data
@@ -62,7 +67,8 @@ def RunExperiment(itineraries, #[iterable] Itinerary objects
 				L2CR=np.array([10000]), #[W] charging rate for LVL2 chargers
 				DCFCR=np.array([150000]), #[W] charging rate for DCFC chargers
 				DCFCP=np.array([15*60]), #[s] penalty for traveling to DCFC charger
-				FRQ=1): #Allows down-selection of itineraries for debugging
+				FRQ=1, #Allows down-selection of itineraries for debugging
+				iterations=3): #Number of times to run each case
 	#Down-selecting itineraries
 	selected_itineraries=itineraries[np.arange(0,len(itineraries),FRQ).astype(int)]
 	#Creating the experiment levels
@@ -82,22 +88,15 @@ def RunExperiment(itineraries, #[iterable] Itinerary objects
 	rows_exp[:,9]=DCFCR[rows[:,9]]
 	rows_exp[:,10]=DCFCP[rows[:,10]]
 	#Pre-allocating the data array
-	#Data array will have form [idx,HC,WC,DCL,CC,CM,CH,BC,PIP,L2CR,DCFCR,DCFCP,DT,DD,SICT,SICD]
-	#DT - Daily Travel Distance [m]
-	#DD - Daily Dwell Time [s]
-	#SICT - Inconvenience Score (Trip) [min/trip]
-	#SICD - Inconvenience Score (Distance) [min/km]
-	data=np.zeros((len(rows_exp)*len(selected_itineraries),16))
-	# print(data.shape)
+	#Data array will have form [idx,HC,WC,DCL,CC,CM,CH,BC,PIP,L2CR,DCFCR,DCFCP,SICD]
+	#SIC - Inconvenience Score (Distance) [min/km]
+	data=np.zeros((len(rows_exp)*len(selected_itineraries),13))
 	k=0
 	#Main Loop
-	for idx in range(len(rows_exp)):
+	for idx in tqdm(range(len(rows_exp))):
 		row=rows_exp[idx]
-		print('Row {} of {}'.format(idx,len(rows_exp)))
-		# print(row)
 		#Generating results for a given case
-		data[k:k+len(selected_itineraries)]=RunCase(idx,selected_itineraries,row)
-		print(data[k:k+len(selected_itineraries),14].mean(),data[k:k+len(selected_itineraries),15].mean())
+		data[k:k+len(selected_itineraries)]=RunCase(idx,selected_itineraries,row,iterations=iterations)
 		k+=len(selected_itineraries)
 	return data
 
@@ -108,27 +107,33 @@ def ConsolidateResults(df):
 	data_out=np.empty((unique_cases.shape[0],data.shape[1]))
 	for idx in unique_cases.astype(int):
 		data_out[idx]=data[unique_case_indices==idx].mean(axis=0)
-	return data_out
+	df_out=pd.DataFrame(data_out,columns=df.keys())
+	return df_out
 
+def Run(itineraries,
+	HC=np.array([0,1]),
+	WC=np.array([0,1]),
+	DCL=np.array([0,.075,.15]),
+	BC=np.array([40,80,120])*1000*3600,
+	DCFCR=np.array([50,150,250])*1000,
+	DCFCP=np.array([0,25,50])*60,
+	FRQ=1,
+	iterations=3):
 
-if __name__ == "__main__":
-	print('Loading Data')
-	itineraries=pkl.load(open('long_itineraries_DEN_MSA.pkl','rb'))
 	print('Running Experiment')
 	data=RunExperiment(itineraries,
-				HC=np.array([0,1]),
-				WC=np.array([0,1]),
-				DCL=np.array([0,.075,.15]),
-				BC=np.array([40,80,120])*1000*3600,
-				DCFCR=np.array([50,150,250])*1000,
-				DCFCP=np.array([0,25,50])*60,
-				FRQ=1)
-	# data=RunExperiment(long_itineraries,
-	# 			HC=np.array([0,1]),
-	# 			FRQ=1000)
-	print('Saving Data')
-	df=pd.DataFrame(data,
-		columns=['idx','HC','WC','DCL','CC','CM','CH','BC','PIP','L2CR','DCFCR','DCFCP','DT','DD','SICT','SICD'])
-	pkl.dump(df,open('NHTS_Exp_DEN_MSA_0.pkl','wb'))
-	print('Done')
+				HC=HC,
+				WC=WC,
+				DCL=DCL,
+				BC=BC,
+				DCFCR=DCFCR,
+				DCFCP=DCFCP,
+				FRQ=FRQ,
+				iterations=iterations)
 
+	print('Consolidating Results')
+	df=pd.DataFrame(data,
+		columns=['idx','HC','WC','DCL','CC','CM','CH','BC','PIP','L2CR','DCFCR','DCFCP','SIC'])
+	df_consolidated=ConsolidateResults(df)
+
+	return df_consolidated

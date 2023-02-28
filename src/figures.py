@@ -21,6 +21,10 @@ from shapely.geometry import Point,Polygon,MultiPolygon
 from scipy.stats import t
 from scipy.stats._continuous_distns import _distn_names
 
+#Defining some 4 pronged color schemes (source: http://vrl.cs.brown.edu/color)
+color_scheme_4_0=["#8de4d3", "#0e503e", "#43e26d", "#2da0a1"]
+color_scheme_4_1=["#069668", "#49edc9", "#2d595a", "#8dd2d8"]
+
 #Defining some 3 pronged color schemes (source: http://vrl.cs.brown.edu/color)
 color_scheme_3_0=["#72e5ef", "#1c5b5a", "#2da0a1"]
 color_scheme_3_1=["#256676", "#72b6bc", "#1eefc9"]
@@ -233,3 +237,106 @@ def FitBestDist(data,bins=200,dist_names=dist_names,dist_labels=dist_labels):
 
 	return (dist_labels[best_dist_index],getattr(st,dist_names[best_dist_index]),
 		params_list[best_dist_index],np.min(rmse))
+
+def EVTracePlot(bev,optimal_control,soc_trace,max_dwells_disp=100,figsize=(8,8),
+	colors=color_scheme_3_1):
+	
+	cmap=LinearSegmentedColormap.from_list('custom', colors, N=256)
+
+	selection=[0,len(soc_trace)-1]
+	if selection[1]>max_dwells_disp:
+		selection[1]=max_dwells_disp
+
+	indices=np.arange(selection[0],selection[1],1)
+	indices1=np.arange(selection[0],selection[1]+1,1)
+	isHomeCharge=(optimal_control[0][indices]>0)&(bev.isHome[indices])
+	isWorkCharge=(optimal_control[0][indices]>0)&(bev.isWork[indices])
+	isDestCharge=(optimal_control[0][indices]>0)&(bev.isOther[indices])
+	isEnRouteCharge=optimal_control[1][indices]>0
+
+	fig,ax=plt.subplots(3,1,figsize=figsize)
+
+	for axis in ax:
+		# axis.set_prop_cycle(color=colors)
+		axis.set_facecolor('lightgray')
+
+	ax[0].plot(soc_trace[indices1],linewidth=4,color='k')
+	ax[0].plot(soc_trace[indices1],linewidth=3,color=cmap(0))
+	ax[0].plot([0,len(bev.Parks[indices])],[0,0],linestyle='--',color='k')
+	ax[0].plot([0,len(bev.Parks[indices])],[1,1],linestyle='--',color='k')
+	ax[0].grid()
+	ax[0].set_ylabel('SOC [dim]')
+
+	ax[1].bar(indices,optimal_control[0][indices]*isDestCharge/3600,ec='k',color=cmap(0))
+	ax[1].bar(indices,optimal_control[0][indices]*isHomeCharge/3600,ec='k',color=cmap(.33))
+	ax[1].bar(indices,optimal_control[0][indices]*isWorkCharge/3600,ec='k',color=cmap(.66))
+	ax[1].bar(indices,optimal_control[1][indices]*isEnRouteCharge/3600,ec='k',color=cmap(.99))
+	ax[1].legend(['Destination','Home','Work','En Route'])
+	ax[1].grid()
+	ax[1].set_ylabel('Energizing Time [h]')
+
+	ax[2].bar(np.arange(0,len(bev.Trip_Distances[indices]),1),bev.Trip_Distances[indices]/1000,
+		ec='k',color=cmap(0))
+	ax[2].grid()
+	ax[2].set_xlabel('Trip/Park Event')
+	ax[2].set_ylabel('Trip Distance [km]')
+
+	return fig
+
+def SignificantParametersPlot(model,alpha=.05,figsize=(8,8),xlim=None,colors=color_scheme_2_1,lw=3):
+
+	params=model._results.params[1:]
+	error=model._results.bse[1:]
+	pvalues=model._results.pvalues[1:]
+	names=np.array(list(dict(model.params).keys()))[1:]
+	params=params[pvalues<alpha]
+	error=error[pvalues<alpha]
+	names=names[pvalues<alpha]
+	pvalues1=pvalues[pvalues<alpha]
+	name_lengths=[len(name) for name in names]
+	name_length_order=np.flip(np.argsort(name_lengths))
+
+	fig,ax=plt.subplots(figsize=figsize)
+
+	plt.barh(list(range(len(params))),params[name_length_order],xerr=error,
+		ec=colors[1],ls='-',lw=lw,fc=colors[0],height=.75,
+		error_kw=dict(ecolor=colors[1],lw=lw,capsize=5,capthick=2))
+
+	ax.set_facecolor('lightgray')
+	ax.set_xlabel('Coefficient Value [-]',fontsize='x-large')
+	ax.set_ylabel('Coefficient',fontsize='x-large')
+	ax.set_yticks(list(range(len(names))))
+	ax.set_yticklabels(names[name_length_order])
+	if xlim != None:
+		ax.set_xlim(xlim)
+	ax.grid(linestyle='--')
+
+	return fig
+
+# def SignificantParametersComparisonPlot(model1,model2,model3,alpha=.05):
+# 	params=model1._results.params[1:]
+# 	error=model1._results.bse[1:]
+# 	pvalues=model1._results.pvalues[1:]
+# 	names=np.array(list(dict(model1.params).keys()))[1:]
+# 	params=params[pvalues<alpha]
+# 	error=error[pvalues<alpha]
+# 	names=names[pvalues<alpha]
+# 	pvalues1=pvalues[pvalues<alpha]
+# 	params1=model2._results.params[1:][pvalues<alpha]
+# 	params2=model3._results.params[1:][pvalues<alpha]
+# 	name_lengths=[len(name) for name in names]
+# 	name_length_order=np.argsort(name_lengths)
+# 	fig,ax=plt.subplots(figsize=(12,6))
+# 	plt.bar(np.arange(0,len(names),1)-.25,params[name_length_order],width=.2,ls='-',lw=2,
+# 		fc='r',alpha=.5,ec=(0,0,0,1))
+# 	plt.bar(np.arange(0,len(names),1),params1[name_length_order],width=.2,ls='-',lw=2,
+# 		fc='g',alpha=.5,ec=(0,0,0,1))
+# 	plt.bar(np.arange(0,len(names),1)+.25,params2[name_length_order],width=.2,ls='-',lw=2,
+# 		fc='b',alpha=.5,ec=(0,0,0,1))
+# 	ax.set_xlabel('Coefficient',fontsize='x-large')
+# 	ax.set_ylabel('Beta [dim]',fontsize='x-large')
+# 	ax.set_xticks(list(range(len(names))))
+# 	ax.set_xticklabels(names[name_length_order],rotation='vertical')
+# 	ax.grid(linestyle='--')
+# 	ax.legend(['National','Colorado','Denver MSA'])
+# 	return fig
