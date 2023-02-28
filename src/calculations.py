@@ -149,7 +149,7 @@ def haversine(lon1,lat1,lon2,lat2):
 def DownSlectBlocks(gdf,lon,lat,radius):
 	radii=haversine(lon,lat,gdf['centroid_x'].to_numpy(),gdf['centroid_y'].to_numpy())
 	gdf_new=gdf[radii<=radius].copy()
-	gdf_new.reset_index(inplace=True)
+	gdf_new.reset_index(inplace=True,drop=True)
 	return gdf_new
 
 #Function for pulling resource locations for a series of block centroids

@@ -10,6 +10,7 @@ os.environ['USE_PYGEOS'] = '0'
 import geopandas as gpd
 import matplotlib.pyplot as plt
 from io import StringIO
+from tqdm import tqdm
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -63,11 +64,25 @@ def ACS_Series(table,data_name=None,state_FIPS='08'):
 	# print(df)
 	return pd.to_numeric(df[data_name])
 
-def ACS_AddColumn(df,table,data_name=None):
-	series=ACS_Series(table,data_name)
+def ACS_AddColumn(df,table,data_name=None,state_FIPS='08'):
+	series=ACS_Series(table,data_name=data_name,state_FIPS=state_FIPS)
 	df[series._name]=series
 	return df
 
+def ACS_Pull_Columns(columns_dict,state_FIPS='08'):
+	#Keys from columns DataFrame
+	keys_list=list(columns_dict.keys())
+	#Creating DataFrame around first column
+	df=ACS_DF(keys_list[0],state_FIPS=state_FIPS,data_name=columns_dict[keys_list[0]])
+	#Looping through remaining keys
+	for key in tqdm(keys_list[1:]):
+		df=ACS_AddColumn(df,key,state_FIPS=state_FIPS,data_name=columns_dict[key])
+	#Re-setting index
+	df.reset_index(inplace=True,drop=True)
+	#Dropping unnecessary columns
+	df.drop(columns=['NAME','tract','county','state'],inplace=True)
+
+	return df
 
 def ACS_PullTable(table,data_name=None,state_FIPS='08'):
 	pull_request='''
@@ -147,58 +162,61 @@ def ACS_Fix_Total(df,data_keys):
 	df['Total']=totals
 	return df
 
-def PullData(state_FIPS='08',path_to_data='../'):
+def PullData(state_FIPS='08',path_to_data='../Data/'):
 	#Loading in the shells .csv
 	t0=time.time()
 	print('Loading in the shells .csv:',end='')
-	shells=pd.read_csv('{}Data/ACS_2021/ACS2021_Table_Shells.csv'.format(path_to_data))
+	shells=pd.read_csv('{}ACS_2021/ACS2021_Table_Shells.csv'.format(path_to_data))
 	print(' {:.4f} seconds'.format(time.time()-t0))
 
 	#Pulling race data
 	t0=time.time()
 	print('Pulling race data:',end='')
-	df_in=ACS_PullGroup('B02001',state_FIPS=state_FIPS)
-	df_race=ACS_Rename(df_in,shells)
-	keys=list(df_race.keys())
-	df_race=ACS_Fix_Total(df_race,keys[1:8])
+	race_columns={
+		'B02001_001E':'Total_Race',
+		'B02001_002E':'White Alone',
+		'B02001_003E':'Black or African American Alone',
+		'B02001_004E':'American Indian and Alaska Native Alone',
+		'B02001_005E':'Asian Alone',
+		'B02001_006E':'Native Hawaiian and Other Pacific Islander Alone',
+		'B02001_007E':'Some Other Race Alone',
+		'B02001_008E':'Two or More Races'}
+	df_race=ACS_Pull_Columns(race_columns,state_FIPS='08')
 	print(' {:.4f} seconds'.format(time.time()-t0))
 
 	#Pulling housing type and tenure data
 	t0=time.time()
 	print('Pulling housing type and tenure data:',end='')
-	df_in=ACS_PullGroup('B25033',state_FIPS=state_FIPS)
-	df_ho=df_in.rename(columns={
-			'B25033_001E':'Total',
-			'B25033_002E':'Owned',
-			'B25033_003E':'1 Owned',
-			'B25033_004E':'2 to 4 Owned',
-			'B25033_005E':'5+ Owned',
-			'B25033_006E':'Mobile Home Owned',
-			'B25033_007E':'Other Owned',
-			'B25033_008E':'Rented',
-			'B25033_009E':'1 Rented',
-			'B25033_010E':'2 to 4 Rented',
-			'B25033_011E':'5+ Rented',
-			'B25033_012E':'Mobile Home Rented',
-			'B25033_013E':'Other Rented'})
-	keys=list(df_ho.keys())
-	df_ho=ACS_Fix_Total(df_ho,[keys[1],keys[7]])
-	df_ho.head(4)[[keys[0],keys[1],keys[7]]]
+	housing_columns={
+		'B25033_001E':'Total_Housing',
+		'B25033_002E':'Owned',
+		'B25033_003E':'1 Owned',
+		'B25033_004E':'2 to 4 Owned',
+		'B25033_005E':'5+ Owned',
+		'B25033_006E':'Mobile Home Owned',
+		'B25033_007E':'Other Owned',
+		'B25033_008E':'Rented',
+		'B25033_009E':'1 Rented',
+		'B25033_010E':'2 to 4 Rented',
+		'B25033_011E':'5+ Rented',
+		'B25033_012E':'Mobile Home Rented',
+		'B25033_013E':'Other Rented'}
+	df_housing=ACS_Pull_Columns(housing_columns,state_FIPS='08')
 	print(' {:.4f} seconds'.format(time.time()-t0))
 
 	#Pulling median income data
 	t0=time.time()
 	print('Pulling median income data:',end='')
-	df_income=ACS_DF('B19013_001E',data_name='Median Income',state_FIPS=state_FIPS)
-	med_inc=df_income['Median Income'].to_numpy()
-	med_inc[med_inc<0]=0
-	df_income['Median Income']=med_inc
+	income_columns={
+		'B19013_001E':'Median Income'}
+	df_income=ACS_Pull_Columns(income_columns,state_FIPS='08')
+	df_income['Median Income'][df_income['Median Income']<0]=np.nan
 	print(' {:.4f} seconds'.format(time.time()-t0))
 
 	#Loading in census tract geometry data
 	t0=time.time()
 	print('Loading in census tract geometry data:',end='')
-	us_ct=gpd.read_file('{}Data/ACS_2021/Tract_Geometries/cb_2021_us_tract_500k.shp'.format(path_to_data))
+	us_ct=gpd.read_file('{}ACS_2021/Tract_Geometries/cb_2021_us_tract_500k.shp'.format(path_to_data))
 	co_ct=us_ct[us_ct['STATEFP']==state_FIPS].copy()
 	co_ct['FIPS']=co_ct['GEOID']
 	print(' {:.4f} seconds'.format(time.time()-t0))
@@ -215,24 +233,22 @@ def PullData(state_FIPS='08',path_to_data='../'):
 	df_income.sort_values('FIPS',inplace=True)
 	df_income.reset_index(inplace=True,drop=True)
 
-	df_ho.sort_values('FIPS',inplace=True)
-	df_ho.reset_index(inplace=True,drop=True)
+	df_housing.sort_values('FIPS',inplace=True)
+	df_housing.reset_index(inplace=True,drop=True)
 	print(' {:.4f} seconds'.format(time.time()-t0))
 
 	#Joining the DataFrames
 	t0=time.time()
 	print('Joining the DataFrames:',end='')
-	co_ct=co_ct.join(df_ho,lsuffix='_ho')
-	co_ct=co_ct.join(df_race,lsuffix='_ra')
-	co_ct=co_ct.join(df_income,lsuffix='_mi')
+	co_ct=co_ct.join(df_housing,lsuffix='_housing')
+	co_ct=co_ct.join(df_race,lsuffix='_race')
+	co_ct=co_ct.join(df_income,lsuffix='_income')
 	print(' {:.4f} seconds'.format(time.time()-t0))
-
-	#Dropping redundant columns
 
 	#Pickling
 	t0=time.time()
 	print('Pickling:',end='')
-	pkl.dump(co_ct,open('{}Data/Generated_Data/Census_Tract_Demographic_Data_{}.pkl'.format(
+	pkl.dump(co_ct,open('{}Generated_Data/Census_Tract_Demographic_Data_{}.pkl'.format(
 		path_to_data,state_FIPS),'wb'))
 	print(' {:.4f} seconds'.format(time.time()-t0))
 
