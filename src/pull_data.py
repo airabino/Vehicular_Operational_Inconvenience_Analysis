@@ -15,6 +15,21 @@ from tqdm import tqdm
 import warnings
 warnings.filterwarnings("ignore")
 
+#Function for calculating distances between lon/lat pairs
+def haversine(lon1,lat1,lon2,lat2):
+
+	r=6372800 #[m]
+
+	dLat=np.radians(lat2-lat1)
+	dLon=np.radians(lon2-lon1)
+	lat1=np.radians(lat1)
+	lat2=np.radians(lat2)
+
+	a=np.sin(dLat/2)**2 + np.cos(lat1)*np.cos(lat2)*np.sin(dLon/2)**2
+	c=2*np.arcsin(np.sqrt(a))
+
+	return c*r
+
 def ACS_DF(table,data_name=None,state_FIPS='08'):
 	pull_request='''
 	https://api.census.gov/data/2021/acs/acs5?get=NAME,{}&for=tract:*&in=state:{}
@@ -260,9 +275,140 @@ def LoadACSData(filepath):
 	gdf['centroid_y']=gdf.centroid.y
 	return gdf
 
-if __name__ == "__main__":
-	argv=sys.argv
-	if len(argv)>=2:
-		PullData(argv[1])
-	else:
-		PullData()
+#Function for pulling resource locations for a series of block centroids
+def PullDataCentroids(bmdp,lons,lats):
+	resources_lons,resources_lats,resources=[],[],[]
+	centroid_lons,centroid_lats,centroid_indices=[],[],[]
+	for idx in tqdm(range(len(lons))):
+	# for idx in tqdm(range(5)):
+		try:
+			rlon,rlat,r=bmdp.PullResources(lons[idx],lats[idx])
+			# print(len(resources_lons),len(rlon))
+			resources_lons.extend(rlon)
+			resources_lats.extend(rlat)
+			resources.extend(r)
+			centroid_lons.extend([lons[idx]]*len(r))
+			centroid_lats.extend([lats[idx]]*len(r))
+			centroid_indices.extend([idx]*len(r))
+		except:
+			print(idx)
+			pass
+	return resources_lons,resources_lats,resources,centroid_lons,centroid_lats,centroid_indices
+
+def AddMaxRadii(gdf):
+
+	#Pulling bounds
+	bounds=gdf.bounds
+
+	#Pulling bbox coords
+	minx=bounds['minx'].to_numpy()
+	miny=bounds['miny'].to_numpy()
+	maxx=bounds['maxx'].to_numpy()
+	maxy=bounds['maxy'].to_numpy()
+
+	#calculating radii
+	max_radii=haversine(minx,miny,maxx,maxy)/2
+
+	#Adding radii
+	gdf['max_radius']=max_radii
+
+	return gdf
+
+def AddCentroidLonLat(gdf):
+
+	#Adding the centroids
+	gdf['centroid_lon']=gdf['geometry'].centroid.x
+	gdf['centroid_lat']=gdf['geometry'].centroid.y
+
+	return gdf
+
+#Class for generating pull requests, pulling, and processing data from Bing Maps
+class BingMapsDataPuller():
+	def __init__(self,key):
+		self.key=key
+
+	def Pull_GDF(self,gdf):
+
+		#Adding centroid locations to gdf
+		gdf=AddCentroidLonLat(gdf)
+
+		#Initializing loop varaible
+		resources_lons=[None]*gdf.shape[0]
+		resources_lats=[None]*gdf.shape[0]
+		resources=[None]*gdf.shape[0]
+
+		#Main loop
+		for idx in tqdm(range(gdf.shape[0])):
+		# for idx in tqdm(range(5)):
+
+			lon=gdf['centroid_lon'][idx]
+			lat=gdf['centroid_lat'][idx]
+
+			try:
+				rlon,rlat,r=self.PullResources(lon,lat)
+				resources_lons[idx]=rlon
+				resources_lats[idx]=rlat
+				resources[idx]=r
+
+			except:
+				print(idx)
+				pass
+
+		#Adding data to gdf
+		gdf['resource_lons']=resources_lons
+		gdf['resource_lats']=resources_lats
+		gdf['resources']=resources
+
+		return gdf
+
+	def PullResources(self,lon,lat,radius=5000):
+
+		pull_shop,pull_eat_drink,pull_see_do=self.GeneratePullRequests(lon,lat,radius)
+
+		return self.Pull(pull_shop,pull_eat_drink,pull_see_do)
+
+	def GeneratePullRequests(self,lon,lat,radius):
+
+		pull_shop='''
+		https://dev.virtualearth.net/REST/v1/LocalSearch/?userCircularMapView=
+		{:.6f},{:.6f},{:.2f}&type=Shop&maxResults=25&key={}
+		'''.format(lat,lon,radius,self.key)
+		pull_shop="".join(line.strip() for line in pull_shop.splitlines())
+
+		pull_eat_drink='''
+		https://dev.virtualearth.net/REST/v1/LocalSearch/?userCircularMapView=
+		{:.6f},{:.6f},{:.2f}&type=EatDrink&maxResults=25&key={}
+		'''.format(lat,lon,radius,self.key)
+		pull_eat_drink="".join(line.strip() for line in pull_eat_drink.splitlines())
+
+		pull_see_do='''
+		https://dev.virtualearth.net/REST/v1/LocalSearch/?userCircularMapView=
+		{:.6f},{:.6f},{:.2f}&type=SeeDo&maxResults=25&key={}
+		'''.format(lat,lon,radius,self.key)
+		pull_see_do="".join(line.strip() for line in pull_see_do.splitlines())
+
+		return pull_shop,pull_eat_drink,pull_see_do
+
+	def Pull(self,pull_shop,pull_eat_drink,pull_see_do):
+
+		results_shop=requests.get(pull_shop).json()
+		results_eat_drink=requests.get(pull_eat_drink).json()
+		results_see_do=requests.get(pull_see_do).json()
+
+		resources=np.array((
+			results_shop['resourceSets'][0]['resources']+
+			results_eat_drink['resourceSets'][0]['resources']+
+			results_see_do['resourceSets'][0]['resources']))
+
+		resources_lons,resources_lats=np.zeros(len(resources)),np.zeros(len(resources))
+
+		success=[False]*(len(resources))
+		for idx,resource in enumerate(resources):
+			try:
+				resources_lons[idx]=resource['point']['coordinates'][1]
+				resources_lats[idx]=resource['point']['coordinates'][0]
+				success[idx]=True
+			except:
+				pass
+
+		return resources_lons[success],resources_lats[success],resources[success]

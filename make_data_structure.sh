@@ -1,6 +1,7 @@
 #!/bin/bash
 
-afdc_key="HGPBj8jd5JT96ixLhRl8wP970Ux3WHDZbye7EIrr"
+source keys.txt
+afdc_key=$afdc_key
 
 mkdir -p Data/NHTS_2017
 mkdir -p Data/Generated_Data
@@ -40,6 +41,7 @@ fi
 
 if [ ! -f Data/AFDC/evse_stations.json ]; then
 	afdc_url="https://developer.nrel.gov/api/alt-fuel-stations/v1.json?fuel_type=ELEC&limit=all&api_key=${afdc_key}"
+	echo $afdc_url
 	curl -o Data/AFDC/evse_stations.json $afdc_url
 	echo "AFDC Data Downloaded"
 else
