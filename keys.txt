@@ -1,4 +1,0 @@
-[Keys]
-afdc_key=""
-bing_maps_key=""
-mapbox_key=""
