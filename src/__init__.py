@@ -9,6 +9,7 @@ from . import process_nhts_data
 from . import simulation
 from . import designed_experiment
 from . import sic_formulae
+from . import keys_parser
 # from .Experiments import *
 # from .GeoSpatialCalc import *
 # from .ProcessData import *

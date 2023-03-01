@@ -313,30 +313,48 @@ def SignificantParametersPlot(model,alpha=.05,figsize=(8,8),xlim=None,colors=col
 
 	return fig
 
-# def SignificantParametersComparisonPlot(model1,model2,model3,alpha=.05):
-# 	params=model1._results.params[1:]
-# 	error=model1._results.bse[1:]
-# 	pvalues=model1._results.pvalues[1:]
-# 	names=np.array(list(dict(model1.params).keys()))[1:]
-# 	params=params[pvalues<alpha]
-# 	error=error[pvalues<alpha]
-# 	names=names[pvalues<alpha]
-# 	pvalues1=pvalues[pvalues<alpha]
-# 	params1=model2._results.params[1:][pvalues<alpha]
-# 	params2=model3._results.params[1:][pvalues<alpha]
-# 	name_lengths=[len(name) for name in names]
-# 	name_length_order=np.argsort(name_lengths)
-# 	fig,ax=plt.subplots(figsize=(12,6))
-# 	plt.bar(np.arange(0,len(names),1)-.25,params[name_length_order],width=.2,ls='-',lw=2,
-# 		fc='r',alpha=.5,ec=(0,0,0,1))
-# 	plt.bar(np.arange(0,len(names),1),params1[name_length_order],width=.2,ls='-',lw=2,
-# 		fc='g',alpha=.5,ec=(0,0,0,1))
-# 	plt.bar(np.arange(0,len(names),1)+.25,params2[name_length_order],width=.2,ls='-',lw=2,
-# 		fc='b',alpha=.5,ec=(0,0,0,1))
-# 	ax.set_xlabel('Coefficient',fontsize='x-large')
-# 	ax.set_ylabel('Beta [dim]',fontsize='x-large')
-# 	ax.set_xticks(list(range(len(names))))
-# 	ax.set_xticklabels(names[name_length_order],rotation='vertical')
-# 	ax.grid(linestyle='--')
-# 	ax.legend(['National','Colorado','Denver MSA'])
-# 	return fig
+def DataScatterPlot(selected,background,resources_lons,resources_lats,margin=.05,figsize=(8,8),
+	colors=color_scheme_2_1,data_label=None,marker_size=30,ax=None,fontsize='large'):
+	
+	return_fig=False
+	if ax==None:
+		fig,ax=plt.subplots(figsize=figsize)
+		return_fig=True
+	
+	minx=selected.bounds['minx'].min()
+	maxx=selected.bounds['maxx'].max()
+	miny=selected.bounds['miny'].min()
+	maxy=selected.bounds['maxy'].max()
+
+	background.plot(ax=ax,facecolor='lightgray',edgecolor='k')
+	selected.plot(ax=ax,facecolor=colors[1],edgecolor='k')
+	ax.scatter(resources_lons,resources_lats,s=marker_size,c=colors[0],label=data_label,
+		edgecolor='k')
+	
+	ax.set_xlim([minx-(maxx-minx)*margin,maxx+(maxx-minx)*margin])
+	ax.set_ylim([miny-(maxy-miny)*margin,maxy+(maxy-miny)*margin])
+	ax.set_xlabel('Longitude [deg]',fontsize=fontsize)
+	ax.set_ylabel('Latitude [deg]',fontsize=fontsize)
+	ax.legend(fontsize=fontsize,edgecolor='k',facecolor='k',labelcolor='w')
+
+	if return_fig:
+		return fig
+
+def ComparisonDataScatterPlot(selected,background,
+	data_1_lons,data_1_lats,data_2_lons,data_2_lats,
+	margin=.05,figsize=(12,6),colors=color_scheme_2_1,horizontal=True,
+	data_1_label=None,data_2_label=None,
+	marker_size=30,fontsize='medium'):
+	
+	if horizontal:
+		fig,ax=plt.subplots(1,2,figsize=figsize)
+	else:
+		fig,ax=plt.subplots(2,1,figsize=figsize)
+	DataScatterPlot(selected,background,data_1_lons,data_1_lats,
+		ax=ax[0],colors=colors,data_label=data_1_label,
+		marker_size=marker_size,margin=margin,fontsize=fontsize)
+	DataScatterPlot(selected,background,data_2_lons,data_2_lats,
+		ax=ax[1],colors=colors,data_label=data_2_label,
+		marker_size=marker_size,margin=margin,fontsize=fontsize)
+
+	return fig

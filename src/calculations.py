@@ -68,31 +68,17 @@ def RemoveOutlierResources(resources_lons,resources_lats,resources):
 
 	return resources_lons,resources_lats,resources
 
-
-
-	
-	outliers=OutlierIndices(resources_lons)
-	resources_lons=resources_lons[~outliers]
-	resources_lats=resources_lats[~outliers]
-	resources=resources[~outliers]
-	outliers=OutlierIndices(resources_lons)
-	resources_lons=resources_lons[~outliers]
-	resources_lats=resources_lats[~outliers]
-	resources=resources[~outliers]
-	outliers=OutlierIndices(resources_lons)
-	resources_lons=resources_lons[~outliers]
-	resources_lats=resources_lats[~outliers]
-	resources=resources[~outliers]
-	return resources_lons,resources_lats,resources
-
 #Function for loading in charger data
-def LoadChargerData(filename,lon=None,lat=None,radius=None):
+def LoadAFDCData(filename='Data/AFDC/evse_stations.json',lon=None,lat=None,radius=None):
+
 	data=json.load(open(filename))
 	df_all=pd.DataFrame(data["fuel_stations"])
+
 	if all([lon,lat,radius]):
 		radii=haversine(lon,lat,df_all['longitude'].to_numpy(),df_all['latitude'].to_numpy())
 		df_all=df_all[radii<=radius]
-		df_all.reset_index(inplace=True)
+		df_all.reset_index(inplace=True,drop=True)
+
 	return df_all
 
 #Function for determining Destination Charger Likelihood (DCL)
