@@ -2,4 +2,3 @@
 afdc_key="HGPBj8jd5JT96ixLhRl8wP970Ux3WHDZbye7EIrr"
 bing_maps_key="AsqO6CWBgTU-V6TLXXLAeU8nSUTVteIE5bc5zbmCVanvaVhR7zF9if18dVKnh0WD"
 mapbox_key="pk.eyJ1IjoiYWlyYWJpbm8iLCJhIjoiY2wzZGR3cHZ3MDdpbzNqcXBxZ2RvZXV0dSJ9.5SgDnIFa2heDP27DTC0L7g"
-new_key=""
