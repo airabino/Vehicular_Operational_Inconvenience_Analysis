@@ -31,150 +31,85 @@ def haversine(lon1,lat1,lon2,lat2):
 	return c*r
 
 def ACS_DF(table,data_name=None,state_FIPS='08'):
+
 	pull_request='''
 	https://api.census.gov/data/2021/acs/acs5?get=NAME,{}&for=tract:*&in=state:{}
 	'''.format(table,state_FIPS)
-	# print(pull_request)
 	pull_request="".join(line.strip() for line in pull_request.splitlines())
-	# print(pull_request)
+
 	results=requests.get(pull_request)
 	content=results._content
 	content_str=str(content)
+
 	content_str=content_str.replace('[','')
 	content_str=content_str.replace(']','')
 	content_str=content_str.replace('"','')
 	content_str=content_str.replace('b\'','')
 	content_str=content_str.replace('\'','')
 	content_str=content_str.replace(',\\n','\n')
+
 	df=pd.read_csv(StringIO(content_str),dtype=str)
+
 	df['FIPS']=df['state']+df['county']+df['tract']
+
 	df[[table,'tract','county','state']]=df[[table,'tract','county','state']].apply(pd.to_numeric)
+
 	if data_name!=None:
 		df.rename(columns={table:data_name},inplace=True)
 	return df
 
 def ACS_Series(table,data_name=None,state_FIPS='08'):
+
 	pull_request='''
 	https://api.census.gov/data/2021/acs/acs5?get=NAME,{}&for=tract:*&in=state:{}
 	'''.format(table,state_FIPS)
-	# print(pull_request)
 	pull_request="".join(line.strip() for line in pull_request.splitlines())
-	# print(pull_request)
+
 	results=requests.get(pull_request)
 	content=results._content
 	content_str=str(content)
+
 	content_str=content_str.replace('[','')
 	content_str=content_str.replace(']','')
 	content_str=content_str.replace('"','')
 	content_str=content_str.replace('b\'','')
 	content_str=content_str.replace('\'','')
 	content_str=content_str.replace(',\\n','\n')
+
 	df=pd.read_csv(StringIO(content_str),dtype=str)
-	# df[[table]]=df[[table]].apply(pd.to_numeric)
+
 	if data_name!=None:
 		df.rename(columns={table:data_name},inplace=True)
 	else:
 		data_name=table
-	# print(data_name)
-	# print(df)
+
 	return pd.to_numeric(df[data_name])
 
 def ACS_AddColumn(df,table,data_name=None,state_FIPS='08'):
+
 	series=ACS_Series(table,data_name=data_name,state_FIPS=state_FIPS)
 	df[series._name]=series
+
 	return df
 
 def ACS_Pull_Columns(columns_dict,state_FIPS='08'):
+
 	#Keys from columns DataFrame
 	keys_list=list(columns_dict.keys())
+
 	#Creating DataFrame around first column
 	df=ACS_DF(keys_list[0],state_FIPS=state_FIPS,data_name=columns_dict[keys_list[0]])
+
 	#Looping through remaining keys
 	for key in tqdm(keys_list[1:]):
 		df=ACS_AddColumn(df,key,state_FIPS=state_FIPS,data_name=columns_dict[key])
+
 	#Re-setting index
 	df.reset_index(inplace=True,drop=True)
+
 	#Dropping unnecessary columns
 	df.drop(columns=['NAME','tract','county','state'],inplace=True)
 
-	return df
-
-def ACS_PullTable(table,data_name=None,state_FIPS='08'):
-	pull_request='''
-	https://api.census.gov/data/2021/acs/acs5?get=NAME,{}&for=tract:*&in=state:{}
-	'''.format(table,state_FIPS)
-	# print(pull_request)
-	pull_request="".join(line.strip() for line in pull_request.splitlines())
-	# print(pull_request)
-	results=requests.get(pull_request)
-	content=results._content
-	content_str=str(content)
-	content_str=content_str.replace('[','')
-	content_str=content_str.replace(']','')
-	content_str=content_str.replace('"','')
-	content_str=content_str.replace('b\'','')
-	content_str=content_str.replace('\'','')
-	content_str=content_str.replace(',\\n','\n')
-	df=pd.read_csv(StringIO(content_str),dtype=str)
-	print(df)
-	df['FIPS']=df['state']+df['county']+df['tract']
-	df[[table,'tract','county','state']]=df[[table,'tract','county','state']].apply(pd.to_numeric)
-	if data_name!=None:
-		df.rename(columns={table:data_name},inplace=True)
-	return df
-
-def ACS_PullGroup(table,data_name=None,state_FIPS='08'):
-	pull_request='''
-	https://api.census.gov/data/2021/acs/acs5?get=group({})&for=tract:*&in=state:{}
-	'''.format(table,state_FIPS)
-	pull_request="".join(line.strip() for line in pull_request.splitlines())
-	results=requests.get(pull_request)
-	content=results._content
-	content_str=str(content)
-	content_str=content_str.replace('[','')
-	content_str=content_str.replace(']','')
-	content_str=content_str.replace('"','')
-	content_str=content_str.replace('b\'','')
-	content_str=content_str.replace('\'','')
-	content_str=content_str.replace(',\\n','\n')
-	df=pd.read_csv(StringIO(content_str),dtype=str)
-	n=len(table)+5
-	columns=list(df.keys())
-	drop=[]
-	for key in columns:
-		if (key[:len(table)]==table)&((len(key)!=n)|(key[-1]!='E')):
-			drop.append(key)
-	df=df.drop(columns=drop)
-	df['FIPS']=df['state']+df['county']+df['tract']
-	df[['tract','county','state']]=df[['tract','county','state']].apply(pd.to_numeric)
-	if data_name!=None:
-		df.rename(columns={table:data_name},inplace=True)
-	df.reset_index(inplace=True,drop=True)
-	return df
-
-def ACS_Rename(df,shells):
-	uids=shells['UniqueID'].to_numpy()
-	stub=shells['Stub'].to_numpy()
-	keys=df.keys()
-	rename_dict={}
-	for key in keys:
-		idx=np.argwhere(uids==key[:-1]).flatten()
-		# print(idx,idx.shape)
-		if idx.shape[0]==1:
-			# print(np.argwhere(uids==key[:-1]))
-			rename_str=stub[uids==key[:-1]][0]
-			rename_str=rename_str.replace(':','')
-			rename_str=rename_str.replace('$','')
-			rename_str=rename_str.replace(',','')
-			rename_dict[key]=rename_str
-	# print(rename_dict)
-	df.rename(columns=rename_dict,inplace=True)
-	return df
-
-def ACS_Fix_Total(df,data_keys):
-	data=df[data_keys].to_numpy().astype(int)
-	totals=data.sum(axis=1)
-	df['Total']=totals
 	return df
 
 def PullData(state_FIPS='08',path_to_data='../Data/'):
@@ -269,50 +204,15 @@ def PullData(state_FIPS='08',path_to_data='../Data/'):
 
 	print('Done')
 
-def LoadACSData(filepath):
-	gdf=pkl.load(open(filepath,'rb'))
-	gdf['centroid_x']=gdf.centroid.x
-	gdf['centroid_y']=gdf.centroid.y
-	return gdf
+#Function for down-selecting census blocks by centroid distance from point
+def DownSlectBlocks(gdf,lon,lat,radius):
 
-#Function for pulling resource locations for a series of block centroids
-def PullDataCentroids(bmdp,lons,lats):
-	resources_lons,resources_lats,resources=[],[],[]
-	centroid_lons,centroid_lats,centroid_indices=[],[],[]
-	for idx in tqdm(range(len(lons))):
-	# for idx in tqdm(range(5)):
-		try:
-			rlon,rlat,r=bmdp.PullResources(lons[idx],lats[idx])
-			# print(len(resources_lons),len(rlon))
-			resources_lons.extend(rlon)
-			resources_lats.extend(rlat)
-			resources.extend(r)
-			centroid_lons.extend([lons[idx]]*len(r))
-			centroid_lats.extend([lats[idx]]*len(r))
-			centroid_indices.extend([idx]*len(r))
-		except:
-			print(idx)
-			pass
-	return resources_lons,resources_lats,resources,centroid_lons,centroid_lats,centroid_indices
+	radii=haversine(lon,lat,gdf.centroid.x.to_numpy(),gdf.centroid.y.to_numpy())
 
-def AddMaxRadii(gdf):
+	gdf_new=gdf[radii<=radius].copy()
+	gdf_new.reset_index(inplace=True,drop=True)
 
-	#Pulling bounds
-	bounds=gdf.bounds
-
-	#Pulling bbox coords
-	minx=bounds['minx'].to_numpy()
-	miny=bounds['miny'].to_numpy()
-	maxx=bounds['maxx'].to_numpy()
-	maxy=bounds['maxy'].to_numpy()
-
-	#calculating radii
-	max_radii=haversine(minx,miny,maxx,maxy)/2
-
-	#Adding radii
-	gdf['max_radius']=max_radii
-
-	return gdf
+	return gdf_new
 
 def AddCentroidLonLat(gdf):
 

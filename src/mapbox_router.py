@@ -9,8 +9,6 @@ import geopandas as gpd
 from tqdm import tqdm
 from routingpy.routers import get_router_by_name
 
-default_key='pk.eyJ1IjoiYWlyYWJpbm8iLCJhIjoiY2wzZGR3cHZ3MDdpbzNqcXBxZ2RvZXV0dSJ9.5SgDnIFa2heDP27DTC0L7g'
-
 def MergeRoutes(routes):
 	route1=routes[0]
 	for key in route1.keys():
@@ -31,7 +29,7 @@ def ReturnRouters(key):
 	return {'mapbox_osrm': {'api_key': key, 'display_name': 'MapBox (OSRM)','profile': 'driving'},
 	'mapbox_valhalla': {'api_key': key,'display_name': 'MapBox (Valhalla)','profile': 'auto'}}
 
-def GetRouterAPI(backend='OSRM',key=default_key):
+def GetRouter(key,backend='OSRM'):
 	routers=ReturnRouters(key)
 	if backend=='OSRM':
 		return {'api':get_router_by_name('mapbox_osrm')(api_key=routers['mapbox_osrm']['api_key']),
@@ -42,22 +40,22 @@ def GetRouterAPI(backend='OSRM',key=default_key):
 	else:
 		print('Please select ORSM or Valhalla')
 
-def RouteSummary(start,finish,router_api=GetRouterAPI()):
+def RouteSummary(router,start,finish):
 	t0=time.time()
-	route=router_api['api'].directions(profile=router_api['information']['profile'],
+	route=router['api'].directions(profile=router['information']['profile'],
 		locations=(start,finish))
 	distances,durations,speeds=PullRouteInfo(route)
 	route_full={'locations':route._geometry,'distances':distances,'durations':durations,
 		'speeds':distances/durations}
 	return route_full
 
-def Route(start,finish,router_api=GetRouterAPI()):
+def Route(router,start,finish):
 	t0=time.time()
-	route=router_api['api'].directions(profile=router_api['information']['profile'],locations=(start,finish))
+	route=router['api'].directions(profile=router['information']['profile'],locations=(start,finish))
 	location_arrays=ChopArray(np.array(route._geometry),25)
 	routes=[None]*len(location_arrays)
 	for i in range(len(location_arrays)):
-		route=router_api['api'].directions(profile=router_api['information']['profile'],
+		route=router['api'].directions(profile=router['information']['profile'],
 			locations=location_arrays[i])
 		distances,durations,speeds=PullRouteInfo(route)
 		routes[i]={'locations':location_arrays[i],'distances':distances,'durations':durations,

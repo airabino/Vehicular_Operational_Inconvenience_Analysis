@@ -76,3 +76,17 @@ def DataToHex(gdf_tracts,gdf_hex,interpolation_keys=default_interpolation_keys,
 	gdf_out=gdf_out.to_crs(epsg=4326)
 
 	return gdf_out
+
+def DataToTracts(gdf_hex,gdf_tracts,extensive_variables=[],intensive_variables=[],
+	nearest_variables=[]):
+	gdf_tracts=gdf_tracts.to_crs(epsg=2163)
+	gdf_hex=gdf_hex.to_crs(epsg=2163)
+	if len(extensive_variables)>0:
+		gdf_out=area_interpolate(gdf_hex,gdf_tracts,extensive_variables=extensive_variables)
+	if len(intensive_variables)>0:
+		gdf_out=area_interpolate(gdf_hex,gdf_tracts,intensive_variables=intensive_variables)
+	if len(nearest_variables)>0:
+		gdf_out=KeepClosest(gdf_out,gdf_tracts,nearest_variables)
+	gdf_out=gdf_out.to_crs(epsg=4326)
+
+	return gdf_out

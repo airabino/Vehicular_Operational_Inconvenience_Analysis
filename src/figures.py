@@ -12,7 +12,7 @@ import geopandas as gpd
 import scipy.stats as st
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap,to_hex
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from tqdm import tqdm
 from shapely.ops import cascaded_union
@@ -21,24 +21,34 @@ from shapely.geometry import Point,Polygon,MultiPolygon
 from scipy.stats import t
 from scipy.stats._continuous_distns import _distn_names
 
+#Defining some 5 pronged color schemes
+
+color_scheme_5_0=["#e7b7a5","#da9b83","#b1cdda","#71909e","#325666"]
+
 #Defining some 4 pronged color schemes (source: http://vrl.cs.brown.edu/color)
 color_scheme_4_0=["#8de4d3", "#0e503e", "#43e26d", "#2da0a1"]
 color_scheme_4_1=["#069668", "#49edc9", "#2d595a", "#8dd2d8"]
+color_scheme_4_2=["#f2606b", "#ffdf79", "#c6e2b1", "#509bcf"] #INCOSE IS2023
 
 #Defining some 3 pronged color schemes (source: http://vrl.cs.brown.edu/color)
 color_scheme_3_0=["#72e5ef", "#1c5b5a", "#2da0a1"]
 color_scheme_3_1=["#256676", "#72b6bc", "#1eefc9"]
 color_scheme_3_2=['#40655e', '#a2e0dd', '#31d0a5']
+color_scheme_3_3=["#f2606b", "#c6e2b1", "#509bcf"] #INCOSE IS2023 minus yellow
 
 #Defining some 2 pronged color schemes (source: http://vrl.cs.brown.edu/color)
 color_scheme_2_0=["#21f0b6", "#2a6866"]
 color_scheme_2_1=["#72e5ef", "#3a427d"]
+color_scheme_2_2=["#1e4d2b", "#c8c372"] #CSU green/gold
 
 #Distributions to try (scipy.stats continuous distributions)
 dist_names=['alpha','beta','gamma','logistic','norm','lognorm']
 dist_labels=['Alpha','Beta','Gamma','Logistic','Normal','Log Normal']
 
-def SelectionPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=color_scheme_2_1,ax=None):
+def SelectionPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=color_scheme_2_1,ax=None,
+	fontsize='medium'):
+	
+	cmap=LinearSegmentedColormap.from_list('custom', colors, N=256)
 
 	minx=selected.bounds['minx'].min()
 	maxx=selected.bounds['maxx'].max()
@@ -50,26 +60,27 @@ def SelectionPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=co
 		fig,ax=plt.subplots(figsize=figsize)
 		return_fig=True
 
-	ax.set_prop_cycle(color=colors)
+	# ax.set_prop_cycle(color=colors)
+	# print(to_hex(cmap(.33)))
 
-	background.plot(ax=ax,fc=colors[1],ec='k',alpha=alpha)
-	selected.plot(ax=ax,fc=colors[0],ec='k',alpha=alpha)
+	background.plot(ax=ax,fc=to_hex(cmap(0)),ec='k',alpha=alpha)
+	selected.plot(ax=ax,fc=to_hex(cmap(.99)),ec='k',alpha=alpha)
 	ax.set_xlim([minx-(maxx-minx)*margin,maxx+(maxx-minx)*margin])
 	ax.set_ylim([miny-(maxy-miny)*margin,maxy+(maxy-miny)*margin])
-	ax.set_xlabel('Longitude [deg]')
-	ax.set_ylabel('Latitude [deg]')
+	ax.set_xlabel('Longitude [deg]',fontsize=fontsize)
+	ax.set_ylabel('Latitude [deg]',fontsize=fontsize)
 	# ax.set_aspect('equal','box')
 
 	if return_fig:
 		return fig
 
 def TractsHexComparisonPlot(tracts,h3_hex,background,figsize=(12,6),margin=.05,alpha=1,
-	colors=color_scheme_2_1):
+	colors=color_scheme_2_1,fontsize='medium'):
 	
 	fig,ax=plt.subplots(1,2,figsize=figsize)
-	SelectionPlot(tracts,background,ax=ax[0],margin=margin,alpha=alpha,
+	SelectionPlot(tracts,background,ax=ax[0],margin=margin,alpha=alpha,fontsize=fontsize,
 		colors=colors)
-	SelectionPlot(h3_hex,background,ax=ax[1],margin=margin,alpha=alpha,
+	SelectionPlot(h3_hex,background,ax=ax[1],margin=margin,alpha=alpha,fontsize=fontsize,
 		colors=colors)
 
 	return fig
@@ -93,7 +104,7 @@ def TractsHexAreaHistogram(tracts,h3_hex,figsize=(8,8),cutoff=2e4,bins=100,color
 	return fig
 
 def DataColumnPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=color_scheme_2_1,ax=None,
-	column=None,color_axis_label=None):
+	column=None,color_axis_label=None,fontsize='medium'):
 	
 	cmap=LinearSegmentedColormap.from_list('custom', colors, N=256)
 
@@ -113,8 +124,8 @@ def DataColumnPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=c
 	im=selected.plot(ax=ax,column=column,ec='k',alpha=alpha,cmap=cmap)
 	ax.set_xlim([minx-(maxx-minx)*margin,maxx+(maxx-minx)*margin])
 	ax.set_ylim([miny-(maxy-miny)*margin,maxy+(maxy-miny)*margin])
-	ax.set_xlabel('Longitude [deg]')
-	ax.set_ylabel('Latitude [deg]')
+	ax.set_xlabel('Longitude [deg]',fontsize=fontsize)
+	ax.set_ylabel('Latitude [deg]',fontsize=fontsize)
 
 	vmin=0
 	vmax=selected[column].max()
@@ -124,7 +135,7 @@ def DataColumnPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=c
 	# sm._A=[]
 	cbr=plt.colorbar(sm, cax=cax, orientation='horizontal')
 	cbr.ax.set_xlabel(color_axis_label,
-		labelpad=10,fontsize='medium')
+		labelpad=10,fontsize=fontsize)
 	# ax.set_aspect('equal','box')
 
 	if return_fig:
@@ -162,10 +173,13 @@ def HistogramComparisonPlot(tracts,h3_hex,horizontal=True,figsize=(12,6),data_la
 
 	return fig
 
-def HistogramDist(data,figsize=(8,8),cutoff=None,bins=100,colors=color_scheme_2_1,ax=None,
-	data_label=None,dist_names=dist_names,dist_labels=dist_labels):
+def HistogramDist(data,figsize=(8,8),column=None,cutoff=None,bins=100,colors=color_scheme_2_1,ax=None,
+	data_label=None,dist_names=dist_names,dist_labels=dist_labels,fontsize='medium'):
 
-	data=data.to_numpy()
+	if column == None:
+		data=data.to_numpy()
+	else:
+		data=data[column].to_numpy()
 	data=data[~np.isnan(data)]
 
 	return_fig=False
@@ -191,9 +205,58 @@ def HistogramDist(data,figsize=(8,8),cutoff=None,bins=100,colors=color_scheme_2_
 	ax.grid(ls='--')
 	if cutoff != None:
 		ax.set_xlim([0,cutoff])
+	ax.legend(fontsize=fontsize)
+	ax.set_xlabel(data_label,fontsize=fontsize)
+	ax.set_ylabel('Bin Size [-]',fontsize=fontsize)
+
+	if return_fig:
+		return fig
+
+def DistributionComparisonPlot(data_list,figsize=(8,8),column=None,cutoff=None,bins=100,
+	colors=color_scheme_2_1,ax=None,data_label=None,dist_names=dist_names,
+	dist_labels=dist_labels,facecolor='lightgray',lw=5,xlim=None):
+
+	cmap=LinearSegmentedColormap.from_list('custom', colors, N=256)
+
+	return_fig=False
+	if ax==None:
+		fig,ax=plt.subplots(figsize=figsize)
+		return_fig=True
+
+	for idx,data in enumerate(data_list):
+
+		if column == None:
+			data=data.to_numpy()
+		else:
+			data=data[column].to_numpy()
+		data=data[~np.isnan(data)]
+
+		dist_name,dist,params,_=FitBestDist(data,bins=bins,dist_names=['lognorm'],dist_labels=['Log Normal'])
+		# print(dist_name)
+
+		densities,bin_edges=np.histogram(data,bins)
+		integral=(densities*np.diff(bin_edges)).sum()
+		bin_edges=(bin_edges+np.roll(bin_edges,-1))[:-1]/2.0
+		y=dist.pdf(bin_edges,loc=params[-2],scale=params[-1],*params[:-2])*integral
+		rmse=np.sqrt(((y-densities)**2).sum()/len(y))
+		if xlim == None:
+			x=np.linspace(bin_edges.min(),bin_edges.max(),1000)
+		else:
+			x=np.linspace(xlim[0],xlim[1],1000)
+		y=dist.pdf(x,loc=params[-2],scale=params[-1],*params[:-2])/densities.sum()
+
+		
+		ax.plot(x,y,lw=lw+2,color='k')
+		ax.plot(x,y,lw=lw,color=cmap(.99*(idx/(len(data_list)-1))),label=data_label[idx])
+	
+	ax.grid(ls='--')
+	if cutoff != None:
+		ax.set_xlim([0,cutoff])
 	ax.legend()
-	ax.set_xlabel(data_label)
-	ax.set_ylabel('Bin Size [-]')
+	ax.set_xlabel('SIC [min/km]')
+	ax.set_ylabel('Probability Mass Function [-]')
+	ax.set_facecolor(facecolor)
+
 
 	if return_fig:
 		return fig
@@ -226,20 +289,24 @@ def FitBestDist(data,bins=200,dist_names=dist_names,dist_labels=dist_labels):
 			loc=params[-2]
 			scale=params[-1]
 			y=dist.pdf(bin_edges,loc=loc,scale=scale,*arg)
+			# print(dist_name)
+			# print(y)
 
 			rmse[idx]=np.sqrt(((y-densities)**2).sum()/len(y))
+			# print(rmse[idx])
 
 		except Exception as e:
 
 			rmse[idx]=sys.maxsize
 
+	rmse[np.isnan(rmse)]=sys.maxsize
 	best_dist_index=np.argmin(rmse)
 
 	return (dist_labels[best_dist_index],getattr(st,dist_names[best_dist_index]),
 		params_list[best_dist_index],np.min(rmse))
 
 def EVTracePlot(bev,optimal_control,soc_trace,max_dwells_disp=100,figsize=(8,8),
-	colors=color_scheme_3_1):
+	colors=color_scheme_3_1,facecolor='lightgray'):
 	
 	cmap=LinearSegmentedColormap.from_list('custom', colors, N=256)
 
@@ -258,7 +325,7 @@ def EVTracePlot(bev,optimal_control,soc_trace,max_dwells_disp=100,figsize=(8,8),
 
 	for axis in ax:
 		# axis.set_prop_cycle(color=colors)
-		axis.set_facecolor('lightgray')
+		axis.set_facecolor(facecolor)
 
 	ax[0].plot(soc_trace[indices1],linewidth=4,color='k')
 	ax[0].plot(soc_trace[indices1],linewidth=3,color=cmap(0))
@@ -283,7 +350,8 @@ def EVTracePlot(bev,optimal_control,soc_trace,max_dwells_disp=100,figsize=(8,8),
 
 	return fig
 
-def SignificantParametersPlot(model,alpha=.05,figsize=(8,8),xlim=None,colors=color_scheme_2_1,lw=3):
+def SignificantParametersPlot(model,alpha=.05,figsize=(8,8),xlim=None,colors=color_scheme_2_1,lw=3,
+	facecolor='lightgray'):
 
 	params=model._results.params[1:]
 	error=model._results.bse[1:]
@@ -302,7 +370,7 @@ def SignificantParametersPlot(model,alpha=.05,figsize=(8,8),xlim=None,colors=col
 		ec=colors[1],ls='-',lw=lw,fc=colors[0],height=.75,
 		error_kw=dict(ecolor=colors[1],lw=lw,capsize=5,capthick=2))
 
-	ax.set_facecolor('lightgray')
+	ax.set_facecolor(facecolor)
 	ax.set_xlabel('Coefficient Value [-]',fontsize='x-large')
 	ax.set_ylabel('Coefficient',fontsize='x-large')
 	ax.set_yticks(list(range(len(names))))
@@ -340,7 +408,7 @@ def DataScatterPlot(selected,background,resources_lons,resources_lats,margin=.05
 	if return_fig:
 		return fig
 
-def ComparisonDataScatterPlot(selected,background,
+def ComparisonDataScatterPlot(gdf1,gdf2,background,
 	data_1_lons,data_1_lats,data_2_lons,data_2_lats,
 	margin=.05,figsize=(12,6),colors=color_scheme_2_1,horizontal=True,
 	data_1_label=None,data_2_label=None,
@@ -350,11 +418,34 @@ def ComparisonDataScatterPlot(selected,background,
 		fig,ax=plt.subplots(1,2,figsize=figsize)
 	else:
 		fig,ax=plt.subplots(2,1,figsize=figsize)
-	DataScatterPlot(selected,background,data_1_lons,data_1_lats,
+	DataScatterPlot(gdf1,background,data_1_lons,data_1_lats,
 		ax=ax[0],colors=colors,data_label=data_1_label,
 		marker_size=marker_size,margin=margin,fontsize=fontsize)
-	DataScatterPlot(selected,background,data_2_lons,data_2_lats,
+	DataScatterPlot(gdf2,background,data_2_lons,data_2_lats,
 		ax=ax[1],colors=colors,data_label=data_2_label,
 		marker_size=marker_size,margin=margin,fontsize=fontsize)
+
+	return fig
+
+def DemographicCorrelationPlot(sic,demographics,figsize=(8,8),xlim=None,colors=color_scheme_2_1,lw=3,
+	facecolor='lightgray',marker_size=30,data_label=None,fontsize='large'):
+	
+	nans=np.isnan(sic)|np.isnan(demographics)
+	sic=sic[~nans]
+	demographics=demographics[~nans]
+
+	fig,ax=plt.subplots(figsize=figsize)
+
+	ax.scatter(demographics,sic,s=marker_size,c=colors[1],label='Data',ec='k')
+	x=np.unique(demographics)
+	y=np.poly1d(np.polyfit(demographics, sic, 1))(np.unique(demographics))
+	ax.plot(x,y,lw=lw+2,color='k')
+	ax.plot(x,y,lw=lw,
+		label='Best Fit Line (R^2={:.4f})'.format(Correlation(demographics,sic)**2),color=colors[0])
+	ax.set_xlabel(data_label,fontsize=fontsize)
+	ax.set_ylabel('SIC [min/km]',fontsize=fontsize)
+	ax.grid(ls='--')
+	ax.legend(fontsize=fontsize)
+	ax.set_facecolor(facecolor)
 
 	return fig

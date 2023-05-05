@@ -32,6 +32,8 @@ def ProduceRegressionResults(df):
 
 	sic=df['SIC']
 
+	df=df[['HC','WC','DCL','BC','DCFCR','DCFCP']]
+
 	data=df.to_numpy()
 	data,maxes,mins=Normalize(data)
 	df_norm=pd.DataFrame(data,columns=df.keys())
@@ -160,3 +162,30 @@ def PrintLaTeXTabular(model,alpha=.05):
 			names[i],params[i],tvalues[i],pvalues[i])
 	out_string+="\\hline"
 	print(out_string)
+
+class SIC_Formula():
+	def __init__(self,model,maxes,mins):
+		self.model=model
+		self.maxes=maxes
+		self.mins=mins
+
+	def Calculate(self,gdf,hc_col='HC',wc_col='WC',bc_col='BC',dcl_col='DCL',
+		dcfcr_col='DCFCR',dcfcp_col='DCFCP'):
+
+		gdf_cal=gdf[[hc_col,wc_col,dcl_col,bc_col,dcfcr_col,dcfcp_col]].copy()
+		# ['HC','WC','DCL','BC','DCFCR','DCFCP']
+
+		# print(gdf_cal)
+
+		gdf_cal.rename(columns={hc_col:'HC',wc_col:'WC',bc_col:'BC',
+			dcl_col:'DCL',dcfcr_col:'DCFCR',dcfcp_col:'DCFCP'},inplace=True)
+
+		# print(gdf_cal)
+
+		data,maxes,mins=Normalize(gdf_cal,self.maxes,self.mins)
+		# print(data)
+		df_norm=pd.DataFrame(data,columns=gdf_cal.keys())
+
+		sic=self.model.predict(df_norm).to_numpy()
+
+		return sic
