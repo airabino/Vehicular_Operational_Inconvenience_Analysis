@@ -98,13 +98,13 @@ def TractsHexAreaHistogram(tracts,h3_hex,figsize=(8,8),cutoff=2e4,bins=100,color
 	ax.grid(ls='--')
 	ax.set_xlim([0,cutoff])
 	ax.legend()
-	ax.set_xlabel('Geometry Area [km]')
+	ax.set_xlabel('Geometry Area [km^2]')
 	ax.set_ylabel('Bin Size [-]')
 
 	return fig
 
 def DataColumnPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=color_scheme_2_1,ax=None,
-	column=None,color_axis_label=None,fontsize='medium'):
+	column=None,color_axis_label=None,fontsize='medium',scale=[]):
 	
 	cmap=LinearSegmentedColormap.from_list('custom', colors, N=256)
 
@@ -127,14 +127,19 @@ def DataColumnPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=c
 	ax.set_xlabel('Longitude [deg]',fontsize=fontsize)
 	ax.set_ylabel('Latitude [deg]',fontsize=fontsize)
 
-	vmin=0
-	vmax=selected[column].max()
+	if scale:
+		vmin=scale[0]
+		vmax=scale[1]
+	else:
+		vmin=selected[column].min()
+		vmax=selected[column].max()
+
 	divider=make_axes_locatable(ax)
-	cax=divider.append_axes('bottom', size='2%', pad=.5)
+	# cax=divider.append_axes('bottom', size=(.1), pad=.5)
 	sm=plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
 	# sm._A=[]
-	cbr=plt.colorbar(sm, cax=cax, orientation='horizontal')
-	cbr.ax.set_xlabel(color_axis_label,
+	cbr=plt.colorbar(sm, ax=ax, orientation='vertical')
+	cbr.ax.set_ylabel(color_axis_label,
 		labelpad=10,fontsize=fontsize)
 	# ax.set_aspect('equal','box')
 
@@ -381,8 +386,44 @@ def SignificantParametersPlot(model,alpha=.05,figsize=(8,8),xlim=None,colors=col
 
 	return fig
 
+def SignificantParametersComparisonPlot(model1,model2,model3,alpha=.05,figsize=(8,8),xlim=None,
+	colors=color_scheme_2_1,lw=3,facecolor='lightgray'):
+	
+	cmap=LinearSegmentedColormap.from_list('custom', colors, N=256)
+
+	params=model1._results.params[1:]
+	error=model1._results.bse[1:]
+	pvalues=model1._results.pvalues[1:]
+	names=np.array(list(dict(model1.params).keys()))[1:]
+	params=params[pvalues<alpha]
+	error=error[pvalues<alpha]
+	names=names[pvalues<alpha]
+	pvalues1=pvalues[pvalues<alpha]
+	params1=model2._results.params[1:][pvalues<alpha]
+	params2=model3._results.params[1:][pvalues<alpha]
+	name_lengths=[len(name) for name in names]
+	name_length_order=np.argsort(name_lengths)
+
+	fig,ax=plt.subplots(figsize=figsize)
+
+	plt.bar(np.arange(0,len(names),1)-.25,params[name_length_order],width=.2,ls='-',lw=lw,
+		fc=cmap(0),ec=(0,0,0,1))
+	plt.bar(np.arange(0,len(names),1),params1[name_length_order],width=.2,ls='-',lw=lw,
+		fc=cmap(.5),ec=(0,0,0,1))
+	plt.bar(np.arange(0,len(names),1)+.25,params2[name_length_order],width=.2,ls='-',lw=lw,
+		fc=cmap(.99),ec=(0,0,0,1))
+
+	ax.set_xlabel('Coefficient',fontsize='x-large')
+	ax.set_ylabel('Beta [dim]',fontsize='x-large')
+	ax.set_xticks(list(range(len(names))))
+	ax.set_xticklabels(names[name_length_order],rotation='vertical')
+	ax.grid(linestyle='--')
+	ax.legend(['National','Colorado','Denver MSA'])
+
+	return fig
+
 def DataScatterPlot(selected,background,resources_lons,resources_lats,margin=.05,figsize=(8,8),
-	colors=color_scheme_2_1,data_label=None,marker_size=30,ax=None,fontsize='large'):
+	colors=color_scheme_2_1,data_label='',marker_size=30,ax=None,fontsize='large'):
 	
 	return_fig=False
 	if ax==None:
@@ -403,7 +444,8 @@ def DataScatterPlot(selected,background,resources_lons,resources_lats,margin=.05
 	ax.set_ylim([miny-(maxy-miny)*margin,maxy+(maxy-miny)*margin])
 	ax.set_xlabel('Longitude [deg]',fontsize=fontsize)
 	ax.set_ylabel('Latitude [deg]',fontsize=fontsize)
-	ax.legend(fontsize=fontsize,edgecolor='k',facecolor='k',labelcolor='w')
+	if data_label:
+		ax.legend(fontsize=fontsize,edgecolor='k',facecolor='k',labelcolor='w')
 
 	if return_fig:
 		return fig
