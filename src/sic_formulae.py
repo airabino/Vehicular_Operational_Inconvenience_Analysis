@@ -32,7 +32,8 @@ def ProduceRegressionResults(df):
 
 	sic=df['SIC']
 
-	df=df[['HC','WC','DCL','BC','DCFCR','DCFCP']]
+	# df=df[['HC','WC','DCL','BC','DCFCR','DCFCP']]
+	df=df[['HC','WC','DCL','BC','ERCR','ERCP']]
 
 	data=df.to_numpy()
 	data,maxes,mins=Normalize(data)
@@ -40,7 +41,7 @@ def ProduceRegressionResults(df):
 
 	df_norm['SIC']=sic
 
-	model=ols('SIC ~ HC * WC * BC * DCL * DCFCR * DCFCP',data=df_norm).fit()
+	model=ols('SIC ~ HC * WC * BC * DCL * ERCR * ERCP',data=df_norm).fit()
 
 	return model,df_norm,data,maxes,mins
 

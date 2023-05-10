@@ -108,6 +108,13 @@ def DataColumnPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=c
 	
 	cmap=LinearSegmentedColormap.from_list('custom', colors, N=256)
 
+	if scale:
+		vmin=scale[0]
+		vmax=scale[1]
+	else:
+		vmin=selected[column].min()
+		vmax=selected[column].max()
+
 	minx=selected.bounds['minx'].min()
 	maxx=selected.bounds['maxx'].max()
 	miny=selected.bounds['miny'].min()
@@ -121,18 +128,11 @@ def DataColumnPlot(selected,background,figsize=(8,8),margin=.05,alpha=1,colors=c
 	ax.set_prop_cycle(color=colors)
 
 	background.plot(ax=ax,fc='lightgray',ec='k',alpha=alpha)
-	im=selected.plot(ax=ax,column=column,ec='k',alpha=alpha,cmap=cmap)
+	im=selected.plot(ax=ax,column=column,ec='k',alpha=alpha,cmap=cmap,vmin=vmin,vmax=vmax)
 	ax.set_xlim([minx-(maxx-minx)*margin,maxx+(maxx-minx)*margin])
 	ax.set_ylim([miny-(maxy-miny)*margin,maxy+(maxy-miny)*margin])
 	ax.set_xlabel('Longitude [deg]',fontsize=fontsize)
 	ax.set_ylabel('Latitude [deg]',fontsize=fontsize)
-
-	if scale:
-		vmin=scale[0]
-		vmax=scale[1]
-	else:
-		vmin=selected[column].min()
-		vmax=selected[column].max()
 
 	divider=make_axes_locatable(ax)
 	# cax=divider.append_axes('bottom', size=(.1), pad=.5)
@@ -219,7 +219,7 @@ def HistogramDist(data,figsize=(8,8),column=None,cutoff=None,bins=100,colors=col
 
 def DistributionComparisonPlot(data_list,figsize=(8,8),column=None,cutoff=None,bins=100,
 	colors=color_scheme_2_1,ax=None,data_label=None,dist_names=dist_names,
-	dist_labels=dist_labels,facecolor='lightgray',lw=5,xlim=None):
+	dist_labels=dist_labels,facecolor='lightgray',lw=5,xlim=None,xlabel='SIC [min/km]'):
 
 	cmap=LinearSegmentedColormap.from_list('custom', colors, N=256)
 
@@ -248,7 +248,8 @@ def DistributionComparisonPlot(data_list,figsize=(8,8),column=None,cutoff=None,b
 			x=np.linspace(bin_edges.min(),bin_edges.max(),1000)
 		else:
 			x=np.linspace(xlim[0],xlim[1],1000)
-		y=dist.pdf(x,loc=params[-2],scale=params[-1],*params[:-2])/densities.sum()
+		# y=dist.pdf(x,loc=params[-2],scale=params[-1],*params[:-2])/densities.sum()
+		y=dist.pdf(x,loc=params[-2],scale=params[-1],*params[:-2])
 
 		
 		ax.plot(x,y,lw=lw+2,color='k')
@@ -258,8 +259,8 @@ def DistributionComparisonPlot(data_list,figsize=(8,8),column=None,cutoff=None,b
 	if cutoff != None:
 		ax.set_xlim([0,cutoff])
 	ax.legend()
-	ax.set_xlabel('SIC [min/km]')
-	ax.set_ylabel('Probability Mass Function [-]')
+	ax.set_xlabel(xlabel)
+	ax.set_ylabel('Probability Density Function [-]')
 	ax.set_facecolor(facecolor)
 
 
@@ -274,6 +275,8 @@ def Determination(x,y):
 	return Correlation(x,y)**2
 
 def FitBestDist(data,bins=200,dist_names=dist_names,dist_labels=dist_labels):
+
+	data=data[~np.isnan(data)]
 
 	densities,bin_edges=np.histogram(data,bins,density=True)
 	bin_edges=(bin_edges+np.roll(bin_edges,-1))[:-1]/2.0
@@ -395,6 +398,8 @@ def SignificantParametersComparisonPlot(model1,model2,model3,alpha=.05,figsize=(
 	error=model1._results.bse[1:]
 	pvalues=model1._results.pvalues[1:]
 	names=np.array(list(dict(model1.params).keys()))[1:]
+	names=np.array([name.replace('DCFCR','ERCR') for name in names])
+	names=np.array([name.replace('DCFCP','ERCP') for name in names])
 	params=params[pvalues<alpha]
 	error=error[pvalues<alpha]
 	names=names[pvalues<alpha]
